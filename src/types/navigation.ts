@@ -17,6 +17,27 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ["admin", "head_coach", "coach", "physio", "athlete"],
   },
   {
+    title: "Effectif",
+    href: "/roster",
+    icon: "Users",
+    description: "Gestion des joueurs",
+    roles: ["admin", "head_coach", "coach", "physio"],
+  },
+  {
+    title: "Wellness",
+    href: "/wellness",
+    icon: "HeartPulse",
+    description: "Saisie quotidienne",
+    roles: ["admin", "head_coach", "coach", "physio"],
+  },
+  {
+    title: "Séances",
+    href: "/sessions",
+    icon: "Dumbbell",
+    description: "Gestion des entraînements",
+    roles: ["admin", "head_coach", "coach"],
+  },
+  {
     title: "Anatomie 3D",
     href: "/anatomy",
     icon: "Bone",

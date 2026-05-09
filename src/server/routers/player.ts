@@ -53,6 +53,32 @@ export const playerRouter = createTRPCRouter({
       return result[0];
     }),
 
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        firstName: z.string().min(1).optional(),
+        lastName: z.string().min(1).optional(),
+        position: z.string().optional(),
+        birthDate: z.string().optional(),
+        sex: z.enum(["male", "female"]).optional(),
+        height: z.string().optional(),
+        weight: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, birthDate, ...rest } = input;
+      const result = await ctx.db
+        .update(players)
+        .set({
+          ...rest,
+          ...(birthDate ? { birthDate: new Date(birthDate) } : {}),
+        })
+        .where(eq(players.id, id))
+        .returning();
+      return result[0];
+    }),
+
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {

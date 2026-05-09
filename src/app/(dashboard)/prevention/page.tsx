@@ -6,9 +6,12 @@ import { WellnessChart } from "@/components/prevention/wellness-chart";
 import { ACWRChart } from "@/components/prevention/acwr-chart";
 import { TeamACWRList } from "@/components/prevention/team-acwr-list";
 import { ProtocolTrident } from "@/components/prevention/protocol-trident";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Activity, Heart, TrendingUp } from "lucide-react";
+import { Shield, Activity, Heart, TrendingUp, AlertTriangle, Plus, X, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // ─── Demo Data ───────────────────────────────────────────────────────────────
 // Used until real API data is connected
@@ -116,11 +119,66 @@ const DEMO_PROTOCOLS = [
   },
 ];
 
+// ─── Injury types ─────────────────────────────────────────────────────────────
+
+const INJURY_LOCATIONS = [
+  "Ischio-jambiers", "Quadriceps", "Genou (LCA)", "Genou (latéral)",
+  "Cheville", "Pied / orteil", "Adducteur / aine", "Mollet",
+  "Tendon d'Achille", "Dos / lombaires", "Hanche", "Épaule", "Autre",
+];
+const INJURY_TYPES_LIST = [
+  "Élongation", "Déchirure grade 1", "Déchirure grade 2", "Déchirure grade 3",
+  "Entorse", "Contusion", "Fracture", "Tendinopathie", "Autre",
+];
+const SEV_COLORS = {
+  minor: "bg-green-900/40 border-green-700/40 text-green-300",
+  moderate: "bg-amber-900/40 border-amber-700/40 text-amber-300",
+  severe: "bg-red-900/40 border-red-700/40 text-red-300",
+};
+
 // ─── Page Component ──────────────────────────────────────────────────────────
 
 export default function PreventionPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>("1");
   const [wellnessSubmitted, setWellnessSubmitted] = useState(false);
+  const [injuryModal, setInjuryModal] = useState(false);
+  const [injuryForm, setInjuryForm] = useState({
+    playerId: "",
+    type: "",
+    location: "",
+    mechanism: "",
+    severity: "moderate" as "minor" | "moderate" | "severe",
+    startDate: new Date().toISOString().split("T")[0]!,
+    returnDate: "",
+  });
+
+  // Real data
+  const { data: teams } = trpc.team.list.useQuery();
+  const teamId = teams?.[0]?.id;
+  const { data: realPlayers = [] } = trpc.player.list.useQuery(
+    { teamId: teamId! }, { enabled: !!teamId }
+  );
+  const { data: teamInjuries = [], refetch: refetchInjuries } =
+    trpc.prevention.listInjuriesByTeam.useQuery(
+      { teamId: teamId! }, { enabled: !!teamId }
+    );
+
+  const playerMap = Object.fromEntries(
+    realPlayers.map((p) => [p.id, `${p.firstName} ${p.lastName}`])
+  );
+
+  const createInjury = trpc.prevention.createInjury.useMutation({
+    onSuccess: () => {
+      void refetchInjuries();
+      setInjuryModal(false);
+      setInjuryForm({
+        playerId: "", type: "", location: "", mechanism: "",
+        severity: "moderate",
+        startDate: new Date().toISOString().split("T")[0]!,
+        returnDate: "",
+      });
+    },
+  });
 
   const demoWellness = generateDemoWellness();
   const demoACWR = generateDemoACWR();
@@ -265,6 +323,188 @@ export default function PreventionPage() {
           <WellnessForm onSubmit={handleWellnessSubmit} />
         </div>
       </div>
+
+      {/* ── Injury Tracker ── */}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-white">
+            <AlertTriangle className="h-4 w-4 text-red-400" />
+            Blessures de l&apos;équipe
+            {teamInjuries.length > 0 && (
+              <span className="rounded-full bg-red-900/40 border border-red-700/40 px-2 py-0.5 text-xs text-red-300">
+                {teamInjuries.length}
+              </span>
+            )}
+          </h2>
+          <Button
+            onClick={() => setInjuryModal(true)}
+            disabled={!teamId}
+            size="sm"
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Signaler
+          </Button>
+        </div>
+
+        {teamInjuries.length === 0 ? (
+          <p className="py-8 text-center text-sm text-zinc-600">
+            Aucune blessure enregistrée — cliquez sur &quot;Signaler&quot; pour ajouter.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {teamInjuries.map((inj) => (
+              <div
+                key={inj.id}
+                className="rounded-xl border border-zinc-800 bg-zinc-800/40 p-3 space-y-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className={cn(
+                    "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                    SEV_COLORS[inj.severity]
+                  )}>
+                    {inj.severity === "minor" ? "Légère" : inj.severity === "moderate" ? "Modérée" : "Sévère"}
+                  </span>
+                  <span className="text-[10px] text-zinc-600">
+                    {new Date(inj.startDate).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                  </span>
+                </div>
+                <p className="text-sm font-semibold text-white">
+                  {playerMap[inj.playerId] ?? "Joueur"}
+                </p>
+                <p className="text-xs text-zinc-400">{inj.location} · {inj.type}</p>
+                {inj.returnDate && (
+                  <p className="text-[10px] text-zinc-600">
+                    Retour : {new Date(inj.returnDate).toLocaleDateString("fr-FR")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Injury Modal */}
+      {injuryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setInjuryModal(false)} />
+          <div className="relative w-full max-w-lg rounded-2xl border border-zinc-700 bg-zinc-900 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Signaler une blessure</h2>
+              <button onClick={() => setInjuryModal(false)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!injuryForm.playerId || !injuryForm.type || !injuryForm.location) return;
+                createInjury.mutate({
+                  ...injuryForm,
+                  mechanism: injuryForm.mechanism || undefined,
+                  returnDate: injuryForm.returnDate || undefined,
+                });
+              }}
+              className="space-y-4"
+            >
+              {/* Player */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Joueur *</label>
+                <select
+                  required value={injuryForm.playerId}
+                  onChange={(e) => setInjuryForm((f) => ({ ...f, playerId: e.target.value }))}
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 text-sm text-white focus:border-red-500 focus:outline-none"
+                >
+                  <option value="">— Sélectionner —</option>
+                  {realPlayers.map((p) => (
+                    <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Type + Location */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Type *</label>
+                  <select required value={injuryForm.type}
+                    onChange={(e) => setInjuryForm((f) => ({ ...f, type: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-red-500 focus:outline-none"
+                  >
+                    <option value="">—</option>
+                    {INJURY_TYPES_LIST.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Zone *</label>
+                  <select required value={injuryForm.location}
+                    onChange={(e) => setInjuryForm((f) => ({ ...f, location: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-red-500 focus:outline-none"
+                  >
+                    <option value="">—</option>
+                    {INJURY_LOCATIONS.map((l) => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Severity */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Sévérité</label>
+                <div className="flex gap-2">
+                  {(["minor", "moderate", "severe"] as const).map((s) => (
+                    <button key={s} type="button"
+                      onClick={() => setInjuryForm((f) => ({ ...f, severity: s }))}
+                      className={cn(
+                        "flex-1 rounded-xl border py-2 text-xs font-medium transition-colors",
+                        injuryForm.severity === s ? SEV_COLORS[s] : "border-zinc-700 text-zinc-500"
+                      )}
+                    >
+                      {s === "minor" ? "Légère" : s === "moderate" ? "Modérée" : "Sévère"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Dates */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Date survenue</label>
+                  <input type="date" value={injuryForm.startDate}
+                    onChange={(e) => setInjuryForm((f) => ({ ...f, startDate: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-zinc-400">Retour prévu</label>
+                  <input type="date" value={injuryForm.returnDate}
+                    onChange={(e) => setInjuryForm((f) => ({ ...f, returnDate: e.target.value }))}
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white focus:border-red-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              {/* Mechanism */}
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-zinc-400">Mécanisme / notes</label>
+                <textarea rows={2} value={injuryForm.mechanism}
+                  onChange={(e) => setInjuryForm((f) => ({ ...f, mechanism: e.target.value }))}
+                  placeholder="Comment s'est produite la blessure..."
+                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:border-red-500 focus:outline-none resize-none"
+                />
+              </div>
+              {createInjury.error && (
+                <p className="text-sm text-red-400">{createInjury.error.message}</p>
+              )}
+              <div className="flex gap-3 pt-2">
+                <Button type="button" variant="ghost" onClick={() => setInjuryModal(false)}
+                  className="flex-1 border border-zinc-700 text-zinc-400">
+                  Annuler
+                </Button>
+                <Button type="submit"
+                  disabled={createInjury.isPending || !injuryForm.playerId || !injuryForm.type || !injuryForm.location}
+                  className="flex-1 bg-red-600 hover:bg-red-500 text-white">
+                  {createInjury.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Signaler"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

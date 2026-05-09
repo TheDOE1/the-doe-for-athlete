@@ -208,4 +208,31 @@ export const preventionRouter = createTRPCRouter({
         .returning();
       return result[0];
     }),
+
+  listInjuriesByTeam: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string().uuid(),
+        limit: z.number().min(1).max(100).default(50),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { players } = await import("../db/schema");
+      const teamPlayers = await ctx.db
+        .select({ id: players.id })
+        .from(players)
+        .where(eq(players.teamId, input.teamId));
+
+      if (teamPlayers.length === 0) return [];
+
+      const { inArray } = await import("drizzle-orm");
+      const playerIds = teamPlayers.map((p) => p.id);
+
+      return ctx.db
+        .select()
+        .from(injuryRecords)
+        .where(inArray(injuryRecords.playerId, playerIds))
+        .orderBy(desc(injuryRecords.startDate))
+        .limit(input.limit);
+    }),
 });

@@ -14,6 +14,9 @@ import {
   LogOut,
   Menu,
   X,
+  Users,
+  HeartPulse,
+  Dumbbell,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -28,6 +31,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Shield,
   FlaskConical,
   Brain,
+  Users,
+  HeartPulse,
+  Dumbbell,
 };
 
 export function Sidebar() {
