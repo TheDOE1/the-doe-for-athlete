@@ -5,7 +5,7 @@ import {
   preventionProtocols,
   injuryRecords,
 } from "../db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 
 export const preventionRouter = createTRPCRouter({
   // ─── ACWR ────────────────────────────────────────────────────────────────────
@@ -225,7 +225,6 @@ export const preventionRouter = createTRPCRouter({
 
       if (teamPlayers.length === 0) return [];
 
-      const { inArray } = await import("drizzle-orm");
       const playerIds = teamPlayers.map((p) => p.id);
 
       return ctx.db
