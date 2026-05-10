@@ -1,23 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { HumanModel } from "./HumanModel";
+import { getMuscleById } from "@/lib/data/muscles";
 
-// ─── Camera rig ───────────────────────────────────────────────────────────────
+// ─── Camera views ─────────────────────────────────────────────────────────────
 
 type ViewType = "anterior" | "posterior" | "lateral_r" | "lateral_l";
 
 const VIEW_POSITIONS: Record<ViewType, [number, number, number]> = {
-  anterior: [0, 0.2, 4.2],
-  posterior: [0, 0.2, -4.2],
-  lateral_r: [4.2, 0.2, 0],
-  lateral_l: [-4.2, 0.2, 0],
+  anterior:  [ 0,   0.2,  4.2],
+  posterior: [ 0,   0.2, -4.2],
+  lateral_r: [ 4.2, 0.2,  0  ],
+  lateral_l: [-4.2, 0.2,  0  ],
 };
 
-// ─── Scene Interior (must be inside Canvas) ───────────────────────────────────
+// ─── Scene interior ───────────────────────────────────────────────────────────
 
 interface SceneInteriorProps {
   selectedId: string | null;
@@ -26,14 +27,15 @@ interface SceneInteriorProps {
   view: ViewType;
 }
 
-function SceneInterior({
-  selectedId,
-  onSelect,
-  showFascialChains,
-  view,
-}: SceneInteriorProps) {
+function SceneInterior({ selectedId, onSelect, showFascialChains, view }: SceneInteriorProps) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef = useRef<any>(null);
+  const [hoveredMuscle, setHoveredMuscle] = useState<string | null>(null);
+
+  // Derive selected fascial chain from the selected muscle
+  const selectedChain = showFascialChains && selectedId
+    ? (getMuscleById(selectedId)?.myofascialLineId ?? null)
+    : null;
 
   useEffect(() => {
     const ctrl = controlsRef.current;
@@ -46,46 +48,55 @@ function SceneInterior({
 
   return (
     <>
-      {/* Lights */}
-      <ambientLight intensity={0.25} color="#4488ff" />
-      {/* Main key light */}
+      {/* ── Warm Medical Clinical Lighting ── */}
+
+      {/* Soft global fill */}
+      <ambientLight intensity={0.32} color="#fff0e8" />
+
+      {/* Key light — warm top-front */}
       <directionalLight
-        position={[3, 8, 5]}
-        intensity={1.0}
-        color="#c8d8ff"
+        position={[2, 9, 5]}
+        intensity={1.15}
+        color="#fff8f0"
         castShadow={false}
       />
-      {/* Fill light */}
-      <directionalLight
-        position={[-4, 2, -3]}
-        intensity={0.35}
-        color="#2030a0"
-      />
-      {/* Rim / back light */}
-      <directionalLight
-        position={[0, -3, -5]}
-        intensity={0.25}
-        color="#4060c0"
-      />
-      {/* Top neon point */}
-      <pointLight position={[0, 4, 1]} intensity={0.5} color="#60aaff" />
-      {/* Bottom glow */}
-      <pointLight position={[0, -2, 0]} intensity={0.2} color="#002060" />
 
-      {/* Human body model */}
+      {/* Warm side fill */}
+      <directionalLight
+        position={[-4, 3, 3]}
+        intensity={0.55}
+        color="#ffe8d0"
+      />
+
+      {/* Warm rim / back light */}
+      <directionalLight
+        position={[0.5, -2, -5]}
+        intensity={0.28}
+        color="#ff9060"
+      />
+
+      {/* Top anatomy lamp */}
+      <pointLight position={[0, 5, 1.5]} intensity={0.45} color="#fff5e8" />
+
+      {/* Ground bounce — warm red-orange */}
+      <pointLight position={[0, -1.8, 0]} intensity={0.18} color="#ff5020" decay={2} />
+
+      {/* ── Human body model ── */}
       <HumanModel
-        selectedId={selectedId}
-        onSelect={onSelect}
-        showFascialChains={showFascialChains}
+        selectedMuscle={selectedId}
+        hoveredMuscle={hoveredMuscle}
+        selectedChain={selectedChain}
+        onMuscleClick={(id) => onSelect(id === selectedId ? null : id)}
+        onMuscleHover={setHoveredMuscle}
       />
 
-      {/* Floor glow disc */}
+      {/* ── Floor disc — warm glow ── */}
       <mesh position={[0, -1.28, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.6, 32]} />
+        <circleGeometry args={[0.65, 32]} />
         <meshBasicMaterial
-          color="#1a3aff"
+          color="#cc4010"
           transparent
-          opacity={0.08}
+          opacity={0.07}
           depthWrite={false}
         />
       </mesh>
@@ -105,7 +116,7 @@ function SceneInterior({
   );
 }
 
-// ─── AnatomyScene ─────────────────────────────────────────────────────────────
+// ─── Public component ─────────────────────────────────────────────────────────
 
 interface AnatomySceneProps {
   selectedId: string | null;
@@ -134,9 +145,9 @@ export default function AnatomyScene({
       gl={{
         antialias: true,
         toneMapping: THREE.ACESFilmicToneMapping,
-        toneMappingExposure: 1.1,
+        toneMappingExposure: 1.2,
       }}
-      style={{ background: "#030712" }}
+      style={{ background: "#0a0604" }}
     >
       <SceneInterior
         selectedId={selectedId}

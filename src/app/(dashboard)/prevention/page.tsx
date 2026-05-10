@@ -184,6 +184,13 @@ export default function PreventionPage() {
   const demoACWR = generateDemoACWR();
   const demoTeamACWR = generateDemoTeamACWR();
 
+  const createWellness = trpc.wellness.create.useMutation({
+    onSuccess: () => {
+      setWellnessSubmitted(true);
+      setTimeout(() => setWellnessSubmitted(false), 3000);
+    },
+  });
+
   const handleWellnessSubmit = (data: {
     sleep: number;
     fatigue: number;
@@ -192,10 +199,17 @@ export default function PreventionPage() {
     mood: number;
     notes: string;
   }) => {
-    // TODO: Connect to tRPC mutation
-    console.log("Wellness submitted:", data);
-    setWellnessSubmitted(true);
-    setTimeout(() => setWellnessSubmitted(false), 3000);
+    const pid = realPlayers[0]?.id;
+    if (!pid) return;
+    createWellness.mutate({
+      playerId: pid,
+      date: new Date().toISOString().split("T")[0]!,
+      sleep: data.sleep,
+      fatigue: data.fatigue,
+      soreness: data.soreness,
+      stress: data.stress,
+      mood: data.mood,
+    });
   };
 
   return (
