@@ -88,7 +88,7 @@ function HistoryRow({ entry }: { entry: Record<string, unknown> }) {
           );
         })}
       </div>
-      {entry.hrv && (
+      {(entry.hrv as number | null) && (
         <div className="shrink-0 text-right">
           <p className="text-sm font-bold text-blue-300">{entry.hrv as number}</p>
           <p className="text-[10px] text-zinc-600">HRV</p>
