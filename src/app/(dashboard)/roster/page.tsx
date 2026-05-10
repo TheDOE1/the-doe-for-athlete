@@ -309,7 +309,7 @@ export default function RosterPage() {
 
   const grouped = filtered.reduce<Record<string, Player[]>>((acc, p) => {
     const pos = p.position ?? "Autre";
-    (acc[pos] ??= []).push(p);
+    (acc[pos] ??= []).push(p as Player);
     return acc;
   }, {});
 
